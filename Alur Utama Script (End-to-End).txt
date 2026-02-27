@@ -1,0 +1,144 @@
+**Alur Utama Script (End-to-End)**
+
+1. **Awal loading aplikasi**
+- Entry point ada di [main.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/main.dart).
+- `main()` melakukan:
+  1. `WidgetsFlutterBinding.ensureInitialized()`
+  2. inisialisasi Firebase (`Firebase.initializeApp(...)`)
+  3. membuat `MasterFirestoreRepository` jika Firebase aktif
+  4. `runApp(SchoolFinanceApp(...))`
+
+2. **Root app dan routing UI**
+- Root UI ada di [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart).
+- `SchoolFinanceApp` adalah stateful app utama:
+  - menyiapkan tab bawah: Dashboard, Transaksi, Laporan, Pengaturan
+  - menyiapkan FAB tengah (quick menu Transaksi/Absensi)
+  - menyiapkan state transaksi, absensi, filter, dan koneksi ke controller master data.
+
+3. **Master data dan sinkron**
+- Logic master data ada di [master_data_controller.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/master_data/application/master_data_controller.dart).
+- `MasterDataController.initialize()` dipanggil saat app start untuk fetch:
+  - kategori
+  - user
+  - role
+  - group/subgroup/murid
+- Jika Firebase error (mis. Firestore API disabled), controller fallback ke data lokal dan set pesan error.
+
+4. **Akses Firestore (repository layer)**
+- Semua operasi Firestore ada di [master_firestore_repository.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/master_data/data/master_firestore_repository.dart).
+- Koleksi yang dipakai:
+  - `master_categories`
+  - `master_users`
+  - `master_user_roles`
+  - `master_student_groups`
+  - `master_student_sub_groups`
+  - `master_students`
+- Controller memanggil repository untuk `fetch/upsert/delete`.
+
+5. **Flow transaksi**
+- Model transaksi ada di [tx_item.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/finance/domain/models/tx_item.dart).
+- Di UI transaksi:
+  - tambah/edit lewat `showTxForm(...)` di [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart)
+  - validasi duplikat, validasi nominal, dan mode checklist murid
+  - `setState` menyimpan transaksi ke list lokal `txs`
+- Untuk kategori checklist:
+  - bisa `nominal per item x jumlah ceklis`
+  - atau mode menabung `nominal per murid` (disimpan di `checkedStudentAmounts`)
+
+6. **Flow absensi**
+- Model absensi ada di [attendance_session_item.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/attendance/domain/models/attendance_session_item.dart).
+- Form absensi di `showAttendanceSessionForm(...)`:
+  - pilih group/subgroup
+  - isi status tiap murid (hadir/sakit/izin/alpa)
+  - ada `Apply All` untuk isi massal
+- Data sesi disimpan ke list lokal `attendanceSessions`.
+
+7. **File pengaturan (Settings)**
+- UI pengaturan ada di komponen `SettingsPage` dalam [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart).
+- Fungsinya:
+  - dark mode
+  - status Firebase
+  - CRUD user
+  - CRUD role
+  - CRUD kategori (termasuk flag useGroup/useSubGroup/useStudent)
+  - CRUD group/subgroup/murid
+  - backup/restore JSON
+
+8. **Simpan data dan backup/restore**
+- Simpan transaksi/absensi saat ini masih in-memory (`setState` list lokal).
+- Backup/restore ada di fungsi `backup()` dan `restore()` di [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart):
+  - Backup: serialisasi ke JSON + copy ke clipboard
+  - Restore: parse JSON, replace list lokal, dan sinkron master via controller
+
+9. **Export laporan**
+- Export ada di [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart):
+  - `exportCsv(...)` untuk CSV (copy ke clipboard)
+  - `exportPdf(...)` pakai package `pdf` + `printing`
+- Laporan UI (`ReportsPage`) memanggil fungsi ini untuk data bulanan/tahunan.
+
+10. **Theme dan tampilan**
+- Theme global ada di [app_theme.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/core/theme/app_theme.dart).
+- Dipakai di `MaterialApp` untuk light/dark dan konsistensi visual.
+
+Jika kamu mau, saya bisa lanjut bikin diagram flow sederhana (startup -> controller -> repository -> UI actions) dalam bentuk tabel agar lebih gampang onboarding tim.
+
+**Flow Onboarding (Ringkas Tabel)**
+
+| Tahap | File utama | Fungsi/Komponen | Input | Proses | Output |
+|---|---|---|---|---|---|
+| Startup app | [main.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/main.dart) | `main()` | App launch | Init Flutter binding, init Firebase, buat repository jika sukses | `SchoolFinanceApp(firebaseEnabled, repository)` |
+| Bootstrap UI | [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart) | `SchoolFinanceApp` + `_SchoolFinanceAppState` | `firebaseEnabled`, `repository` | Buat `MasterDataController`, register listener, panggil `initialize()` | Tab Dashboard/Transaksi/Laporan/Pengaturan siap |
+| Load master data | [master_data_controller.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/master_data/application/master_data_controller.dart) | `initialize()` | Flag firebase + repository | Fetch kategori/user/role/group/subgroup/murid via repository | State master data terisi; error status terset jika gagal |
+| Query Firestore | [master_firestore_repository.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/features/master_data/data/master_firestore_repository.dart) | `fetch*()` | Koleksi Firestore | `orderBy(...).get()` lalu map ke model | List model domain |
+| UI render master | [school_finance_app.dart](/d:/Project/PROJECT%20X/sekolah-mobile-app/catat_kelas/lib/app/school_finance_app.dart) | `SettingsPage`, `TransactionsPage` | State controller + state lokal | Build widget berdasarkan state terbaru | User lihat data + bisa aksi CRUD |
+| Action CRUD master | `SettingsPage` -> callbacks ke controller | `addOrUpdate*`, `delete*` | Input form user | Update list lokal controller, lalu sync Firestore jika aktif | UI refresh + error/success feedback |
+| Action transaksi | `TransactionsPage` / `showTxForm()` | Tambah/edit/hapus transaksi | Input form transaksi | Validasi, hitung nominal, simpan ke `txs` (`setState`) | List transaksi terbarui |
+| Action absensi | `showAttendanceSessionForm()` | CRUD sesi absensi | Input status per murid | Validasi, simpan ke `attendanceSessions` (`setState`) | Tab Absensi terbarui |
+| Backup data | `backup()` | Serialize JSON | State app saat ini | Serialize categories/users/roles/groups/subgroups/students/transactions/attendance | JSON dicopy ke clipboard |
+| Restore data | `restore()` + `replaceFromBackup()` | Parse & replace data | JSON backup | Replace state lokal; master disinkronkan via controller ke Firestore (jika aktif) | App kembali ke snapshot backup |
+| Export laporan | `exportCsv()`, `exportPdf()` | Laporan transaksi | Data transaksi terfilter | Generate CSV/PDF | CSV clipboard / PDF preview-print |
+
+**Mapping UI Action -> Controller -> Repository**
+
+| UI Action | Controller Method | Repository Method |
+|---|---|---|
+| Simpan kategori | `addOrUpdateCategory` | `upsertCategory` |
+| Hapus kategori | `deleteCategory` | `deleteCategory` |
+| Simpan user | `addOrUpdateUser` | `upsertUser` |
+| Hapus user | `deleteUser` | `deleteUser` |
+| Simpan role | `addOrUpdateRole` | `upsertRole` |
+| Hapus role | `deleteRole` | `deleteRole` |
+| Simpan group | `addOrUpdateStudentGroup` | `upsertStudentGroup` |
+| Hapus group | `deleteStudentGroup` | `deleteStudentGroup` |
+| Simpan subgroup | `addOrUpdateStudentSubGroup` | `upsertStudentSubGroup` |
+| Hapus subgroup | `deleteStudentSubGroup` | `deleteStudentSubGroup` |
+| Simpan murid | `addOrUpdateStudent` | `upsertStudent` |
+| Hapus murid | `deleteStudent` | `deleteStudent` |
+
+Kalau kamu mau, saya lanjut buat versi “sequence table per fitur” (contoh: alur `Tambah Transaksi Menabung` langkah demi langkah).
+
+
+Di project catatkelas, database (default) belum dibuat (atau salah project).
+Cara perbaiki cepat:
+
+Buka link error: https://console.cloud.google.com/datastore/setup?project=catatkelas
+Pilih create Cloud Firestore database (default).
+Pilih region.
+Untuk testing awal, pakai mode test dulu (lalu amankan rules nanti).
+Restart app.
+Cara cek data sudah masuk atau belum:
+
+Firebase Console -> pilih project catatkelas.
+Masuk menu Firestore Database.
+Buka tab Data.
+Cek koleksi ini:
+master_categories
+master_users
+master_user_roles
+master_student_groups
+master_student_sub_groups
+master_students
+Lakukan aksi dari app (misal tambah kategori), lalu refresh Data tab dan lihat dokumen baru muncul.
+Tambahan penting:
+
+Di app ini, transaksi dan attendanceSessions masih lokal (belum Firestore), jadi memang tidak akan muncul di Firestore saat ini.

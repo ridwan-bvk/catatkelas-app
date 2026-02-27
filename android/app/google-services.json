@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "615639053371",
+    "project_id": "catatkelas",
+    "storage_bucket": "catatkelas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:615639053371:android:7f8a7b47139f16d3bc181e",
+        "android_client_info": {
+          "package_name": "com.example.catat_kelas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxDGZ0R_eks-XlitpmZwFGPVc6BuNY6Tk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

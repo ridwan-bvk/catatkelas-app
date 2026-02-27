@@ -574,7 +574,9 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Dashboard', 'Transaksi', 'Laporan', 'Pengaturan'];
+    final labels = ['Dashboard', 'Transaksi', 'Laporan'];
+    final pages = _pages();
+    final safeTab = tab.clamp(0, pages.length - 1);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -585,114 +587,151 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
       darkTheme: AppTheme.build(Brightness.dark),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,
       home: Builder(
-        builder: (homeCtx) => Scaffold(
-          appBar: AppBar(
-            title: Text(labels[tab],
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            flexibleSpace: Container(
+        builder: (homeCtx) {
+          final screenWidth = MediaQuery.of(homeCtx).size.width;
+          final fabSize = (screenWidth * 0.15).clamp(54.0, 62.0);
+          final fabIconSize = (fabSize * 0.42).clamp(22.0, 27.0);
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(labels[safeTab],
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              actions: [
+                IconButton(
+                  tooltip: 'Pengaturan',
+                  icon: const Icon(Icons.settings_rounded),
+                  onPressed: () {
+                    Navigator.of(homeCtx).push(
+                      _buildFadeSlideRoute(
+                        Scaffold(
+                          appBar: AppBar(title: const Text('Pengaturan')),
+                          body: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Theme.of(homeCtx).colorScheme.surface,
+                                  Theme.of(homeCtx)
+                                      .colorScheme
+                                      .surfaceContainerLowest,
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                            child: _settingsView(),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(homeCtx)
+                          .colorScheme
+                          .primaryContainer
+                          .withOpacity(0.9),
+                      Theme.of(homeCtx).colorScheme.surface,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+              ),
+            ),
+            body: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Theme.of(homeCtx)
-                        .colorScheme
-                        .primaryContainer
-                        .withOpacity(0.9),
                     Theme.of(homeCtx).colorScheme.surface,
+                    Theme.of(homeCtx).colorScheme.surfaceContainerLowest,
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
+              child: pages[safeTab],
             ),
-          ),
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(homeCtx).colorScheme.surface,
-                  Theme.of(homeCtx).colorScheme.surfaceContainerLowest,
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: _pages()[tab],
-          ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                transitionBuilder: (child, anim) => FadeTransition(
-                  opacity: anim,
-                  child: ScaleTransition(scale: anim, child: child),
-                ),
-                child: fabExpanded
-                    ? Container(
-                        key: const ValueKey('fab-menu'),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.payments_outlined),
-                              title: const Text('Transaksi'),
-                              onTap: _openQuickAddTransaction,
-                            ),
-                            ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.how_to_reg_rounded),
-                              title: const Text('Absensi'),
-                              onTap: _openQuickAddAttendance,
-                            ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              FloatingActionButton(
-                onPressed: () => setState(() => fabExpanded = !fabExpanded),
-                child: AnimatedRotation(
-                  turns: fabExpanded ? 0.125 : 0,
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
+            floatingActionButton: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
-                  child: const Icon(Icons.add_rounded),
+                  transitionBuilder: (child, anim) => FadeTransition(
+                    opacity: anim,
+                    child: ScaleTransition(scale: anim, child: child),
+                  ),
+                  child: fabExpanded
+                      ? Container(
+                          key: const ValueKey('fab-menu'),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.payments_outlined),
+                                title: const Text('Transaksi'),
+                                onTap: _openQuickAddTransaction,
+                              ),
+                              ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.how_to_reg_rounded),
+                                title: const Text('Absensi'),
+                                onTap: _openQuickAddAttendance,
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
-              ),
-            ],
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: tab,
-            onDestinationSelected: (v) => setState(() {
-              tab = v;
-              fabExpanded = false;
-            }),
-            destinations: const [
-              NavigationDestination(
-                  icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-              NavigationDestination(
-                  icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
-              NavigationDestination(
-                  icon: Icon(Icons.assessment_rounded), label: 'Laporan'),
-              NavigationDestination(
-                  icon: Icon(Icons.settings_rounded), label: 'Pengaturan'),
-            ],
-          ),
-        ),
+                SizedBox(
+                  width: fabSize,
+                  height: fabSize,
+                  child: FloatingActionButton(
+                    onPressed: () => setState(() => fabExpanded = !fabExpanded),
+                    child: AnimatedRotation(
+                      turns: fabExpanded ? 0.125 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      child: Icon(Icons.add_rounded, size: fabIconSize),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: tab,
+              onDestinationSelected: (v) => setState(() {
+                tab = v;
+                fabExpanded = false;
+              }),
+              destinations: const [
+                NavigationDestination(
+                    icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+                NavigationDestination(
+                    icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
+                NavigationDestination(
+                    icon: Icon(Icons.assessment_rounded), label: 'Laporan'),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -743,70 +782,73 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
         onAttendanceCsv: exportAttendanceCsv,
         onAttendancePdf: exportAttendancePdf,
       ),
-      SettingsPage(
-        dark: dark,
-        users: users,
-        roles: roles,
-        groups: studentGroups,
-        subGroups: studentSubGroups,
-        students: students,
-        cats: categories,
-        txs: txs,
-        firebaseEnabled: masterController.firebaseEnabled,
-        firebaseError: masterController.lastError,
-        onDark: (v) => setState(() => dark = v),
-        userProfile: userProfile,
-        onOpenProfile: showUserProfilePage,
-        onAddUser: () => showUserForm(),
-        onEditUser: (u) => showUserForm(edit: u),
-        onDeleteUser: (u) async {
-          await masterController.deleteUser(u.id);
-          showInfo(masterController.lastError ?? 'Pengguna berhasil dihapus.');
-        },
-        onUserTap: (u) => showUserActionSheet(u),
-        onAddRole: () => showRoleForm(),
-        onEditRole: (r) => showRoleForm(edit: r),
-        onDeleteRole: (r) async {
-          if (isRoleUsed(r.name)) {
-            showInfo('Role "${r.name}" masih dipakai pengguna.');
-            return;
-          }
-          await masterController.deleteRole(r.id);
-          showInfo(masterController.lastError ?? 'Role berhasil dihapus.');
-        },
-        onAddGroup: () => showGroupForm(),
-        onEditGroup: (g) => showGroupForm(edit: g),
-        onDeleteGroup: (g) async {
-          await masterController.deleteStudentGroup(g.id);
-          showInfo(masterController.lastError ?? 'Group berhasil dihapus.');
-        },
-        onAddSubGroup: () => showSubGroupForm(),
-        onEditSubGroup: (g) => showSubGroupForm(edit: g),
-        onDeleteSubGroup: (g) async {
-          await masterController.deleteStudentSubGroup(g.id);
-          showInfo(masterController.lastError ?? 'Sub Group berhasil dihapus.');
-        },
-        onAddStudent: () => showStudentForm(),
-        onEditStudent: (s) => showStudentForm(edit: s),
-        onDeleteStudent: (s) async {
-          await masterController.deleteStudent(s.id);
-          showInfo(masterController.lastError ?? 'Murid berhasil dihapus.');
-        },
-        onAddCat: () => showCatForm(),
-        onEditCat: (c) => showCatForm(edit: c),
-        onDeleteCat: (c) async {
-          final inUse = isCategoryUsed(c.id);
-          if (inUse) {
-            showInfo('Kategori "${c.name}" sudah dipakai transaksi.');
-            return;
-          }
-          await masterController.deleteCategory(c.id);
-          showInfo(masterController.lastError ?? 'Kategori berhasil dihapus.');
-        },
-        onBackup: backup,
-        onRestore: restore,
-      ),
     ];
+  }
+
+  Widget _settingsView() {
+    return SettingsPage(
+      dark: dark,
+      users: users,
+      roles: roles,
+      groups: studentGroups,
+      subGroups: studentSubGroups,
+      students: students,
+      cats: categories,
+      txs: txs,
+      firebaseEnabled: masterController.firebaseEnabled,
+      firebaseError: masterController.lastError,
+      onDark: (v) => setState(() => dark = v),
+      userProfile: userProfile,
+      onOpenProfile: showUserProfilePage,
+      onAddUser: () => showUserForm(),
+      onEditUser: (u) => showUserForm(edit: u),
+      onDeleteUser: (u) async {
+        await masterController.deleteUser(u.id);
+        showInfo(masterController.lastError ?? 'Pengguna berhasil dihapus.');
+      },
+      onUserTap: (u) => showUserActionSheet(u),
+      onAddRole: () => showRoleForm(),
+      onEditRole: (r) => showRoleForm(edit: r),
+      onDeleteRole: (r) async {
+        if (isRoleUsed(r.name)) {
+          showInfo('Role "${r.name}" masih dipakai pengguna.');
+          return;
+        }
+        await masterController.deleteRole(r.id);
+        showInfo(masterController.lastError ?? 'Role berhasil dihapus.');
+      },
+      onAddGroup: () => showGroupForm(),
+      onEditGroup: (g) => showGroupForm(edit: g),
+      onDeleteGroup: (g) async {
+        await masterController.deleteStudentGroup(g.id);
+        showInfo(masterController.lastError ?? 'Group berhasil dihapus.');
+      },
+      onAddSubGroup: () => showSubGroupForm(),
+      onEditSubGroup: (g) => showSubGroupForm(edit: g),
+      onDeleteSubGroup: (g) async {
+        await masterController.deleteStudentSubGroup(g.id);
+        showInfo(masterController.lastError ?? 'Sub Group berhasil dihapus.');
+      },
+      onAddStudent: () => showStudentForm(),
+      onEditStudent: (s) => showStudentForm(edit: s),
+      onDeleteStudent: (s) async {
+        await masterController.deleteStudent(s.id);
+        showInfo(masterController.lastError ?? 'Murid berhasil dihapus.');
+      },
+      onAddCat: () => showCatForm(),
+      onEditCat: (c) => showCatForm(edit: c),
+      onDeleteCat: (c) async {
+        final inUse = isCategoryUsed(c.id);
+        if (inUse) {
+          showInfo('Kategori "${c.name}" sudah dipakai transaksi.');
+          return;
+        }
+        await masterController.deleteCategory(c.id);
+        showInfo(masterController.lastError ?? 'Kategori berhasil dihapus.');
+      },
+      onBackup: backup,
+      onRestore: restore,
+    );
   }
 
   Future<void> showTxForm({TxItem? edit}) async {

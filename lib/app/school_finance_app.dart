@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -574,10 +576,6 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Dashboard', 'Transaksi', 'Laporan'];
-    final pages = _pages();
-    final safeTab = tab.clamp(0, pages.length - 1);
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Catat Kelas',
@@ -586,152 +584,204 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
       theme: AppTheme.build(Brightness.light),
       darkTheme: AppTheme.build(Brightness.dark),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,
-      home: Builder(
-        builder: (homeCtx) {
-          final screenWidth = MediaQuery.of(homeCtx).size.width;
-          final fabSize = (screenWidth * 0.15).clamp(54.0, 62.0);
-          final fabIconSize = (fabSize * 0.42).clamp(22.0, 27.0);
-          return Scaffold(
-            appBar: AppBar(
-              title: Text(labels[safeTab],
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              actions: [
-                IconButton(
-                  tooltip: 'Pengaturan',
-                  icon: const Icon(Icons.settings_rounded),
-                  onPressed: () {
-                    Navigator.of(homeCtx).push(
-                      _buildFadeSlideRoute(
-                        Scaffold(
-                          appBar: AppBar(title: const Text('Pengaturan')),
-                          body: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Theme.of(homeCtx).colorScheme.surface,
-                                  Theme.of(homeCtx)
-                                      .colorScheme
-                                      .surfaceContainerLowest,
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                            child: _settingsView(),
-                          ),
+      home: widget.firebaseEnabled
+          ? StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const _AuthLoadingPage();
+                }
+                final user = snap.data;
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: user == null
+                      ? const _AuthLoginPage(key: ValueKey('auth-login'))
+                      : Builder(
+                          key: const ValueKey('app-home'),
+                          builder: (homeCtx) => _buildMainScaffold(homeCtx),
+                        ),
+                );
+              },
+            )
+          : Builder(builder: (homeCtx) => _buildMainScaffold(homeCtx)),
+    );
+  }
+
+  Widget _buildMainScaffold(BuildContext homeCtx) {
+    final labels = ['Dashboard', 'Transaksi', 'Laporan'];
+    final pages = _pages();
+    final safeTab = tab.clamp(0, pages.length - 1);
+    final screenWidth = MediaQuery.of(homeCtx).size.width;
+    final fabSize = (screenWidth * 0.15).clamp(54.0, 62.0);
+    final fabIconSize = (fabSize * 0.42).clamp(22.0, 27.0);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(labels[safeTab],
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () {
+              Navigator.of(homeCtx).push(
+                _buildFadeSlideRoute(
+                  Scaffold(
+                    appBar: AppBar(title: const Text('Pengaturan')),
+                    body: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(homeCtx).colorScheme.surface,
+                            Theme.of(homeCtx).colorScheme.surfaceContainerLowest,
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
                         ),
                       ),
-                    );
-                  },
-                ),
-              ],
-              flexibleSpace: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(homeCtx)
-                          .colorScheme
-                          .primaryContainer
-                          .withOpacity(0.9),
-                      Theme.of(homeCtx).colorScheme.surface,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              ),
-            ),
-            body: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(homeCtx).colorScheme.surface,
-                    Theme.of(homeCtx).colorScheme.surfaceContainerLowest,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: pages[safeTab],
-            ),
-            floatingActionButtonLocation:
-                FloatingActionButtonLocation.centerFloat,
-            floatingActionButton: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, anim) => FadeTransition(
-                    opacity: anim,
-                    child: ScaleTransition(scale: anim, child: child),
-                  ),
-                  child: fabExpanded
-                      ? Container(
-                          key: const ValueKey('fab-menu'),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                dense: true,
-                                leading: const Icon(Icons.payments_outlined),
-                                title: const Text('Transaksi'),
-                                onTap: _openQuickAddTransaction,
-                              ),
-                              ListTile(
-                                dense: true,
-                                leading: const Icon(Icons.how_to_reg_rounded),
-                                title: const Text('Absensi'),
-                                onTap: _openQuickAddAttendance,
-                              ),
-                            ],
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                SizedBox(
-                  width: fabSize,
-                  height: fabSize,
-                  child: FloatingActionButton(
-                    onPressed: () => setState(() => fabExpanded = !fabExpanded),
-                    child: AnimatedRotation(
-                      turns: fabExpanded ? 0.125 : 0,
-                      duration: const Duration(milliseconds: 220),
-                      child: Icon(Icons.add_rounded, size: fabIconSize),
+                      child: _settingsView(),
                     ),
                   ),
                 ),
-              ],
+              );
+            },
+          ),
+          if (widget.firebaseEnabled)
+            IconButton(
+              tooltip: 'Logout',
+              icon: const Icon(Icons.logout_rounded),
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (!mounted) return;
+                showInfo('Berhasil logout.');
+              },
             ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: tab,
-              onDestinationSelected: (v) => setState(() {
-                tab = v;
-                fabExpanded = false;
-              }),
-              destinations: const [
-                NavigationDestination(
-                    icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-                NavigationDestination(
-                    icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
-                NavigationDestination(
-                    icon: Icon(Icons.assessment_rounded), label: 'Laporan'),
+        ],
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(homeCtx).colorScheme.primaryContainer.withOpacity(0.9),
+                Theme.of(homeCtx).colorScheme.surface,
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          );
-        },
+          ),
+        ),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(homeCtx).colorScheme.surface,
+              Theme.of(homeCtx).colorScheme.surfaceContainerLowest,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: pages[safeTab],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: ScaleTransition(scale: anim, child: child),
+            ),
+            child: fabExpanded
+                ? Container(
+                    key: const ValueKey('fab-menu'),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withOpacity(0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          dense: true,
+                          leading: Icon(
+                            Icons.payments_outlined,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          title: Text(
+                            'Transaksi',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onTap: _openQuickAddTransaction,
+                        ),
+                        ListTile(
+                          dense: true,
+                          leading: Icon(
+                            Icons.how_to_reg_rounded,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          title: Text(
+                            'Absensi',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onTap: _openQuickAddAttendance,
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          SizedBox(
+            width: fabSize,
+            height: fabSize,
+            child: FloatingActionButton(
+              onPressed: () => setState(() => fabExpanded = !fabExpanded),
+              child: AnimatedRotation(
+                turns: fabExpanded ? 0.125 : 0,
+                duration: const Duration(milliseconds: 220),
+                child: Icon(Icons.add_rounded, size: fabIconSize),
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: tab,
+        onDestinationSelected: (v) => setState(() {
+          tab = v;
+          fabExpanded = false;
+        }),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+          NavigationDestination(
+              icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
+          NavigationDestination(
+              icon: Icon(Icons.assessment_rounded), label: 'Laporan'),
+        ],
       ),
     );
   }
@@ -2482,6 +2532,473 @@ class _SchoolFinanceAppState extends State<SchoolFinanceApp> {
             child: const Text('Restore'),
           )
         ],
+      ),
+    );
+  }
+}
+
+bool _isValidEmail(String input) {
+  return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(input.trim());
+}
+
+bool _isStrongPassword(String input) {
+  return RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$').hasMatch(input);
+}
+
+String _firebaseAuthErrorMessage(FirebaseAuthException e) {
+  switch (e.code) {
+    case 'invalid-email':
+      return 'Format email tidak valid.';
+    case 'user-not-found':
+    case 'wrong-password':
+    case 'invalid-credential':
+      return 'Email atau password salah.';
+    case 'email-already-in-use':
+      return 'Email sudah terdaftar.';
+    case 'weak-password':
+      return 'Password terlalu lemah. Gunakan minimal 8 karakter huruf dan angka.';
+    case 'too-many-requests':
+      return 'Terlalu banyak percobaan. Coba beberapa saat lagi.';
+    case 'network-request-failed':
+      return 'Koneksi internet bermasalah.';
+    default:
+      return e.message ?? 'Terjadi kesalahan autentikasi.';
+  }
+}
+
+class _AuthLoadingPage extends StatelessWidget {
+  const _AuthLoadingPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 10),
+            Text(
+              'Menyiapkan autentikasi...',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthLoginPage extends StatefulWidget {
+  const _AuthLoginPage({super.key});
+
+  @override
+  State<_AuthLoginPage> createState() => _AuthLoginPageState();
+}
+
+class _AuthLoginPageState extends State<_AuthLoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _obscure = true;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_formKey.currentState?.validate() != true) return;
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_firebaseAuthErrorMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    // If user already typed an email, try sending reset. Otherwise show a
+    // small dialog so they can enter the email to reset.
+    String email = _emailCtrl.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    if (!_isValidEmail(email)) {
+      final ctrl = TextEditingController(text: email);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Reset Password'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Kirim')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      email = ctrl.text.trim();
+      if (!_isValidEmail(email)) {
+        messenger.showSnackBar(const SnackBar(content: Text('Email tidak valid.')));
+        return;
+      }
+    }
+
+    try {
+      // Debug log to help trace the flow when user requests password reset
+      // (can be removed later).
+      // ignore: avoid_print
+      print('DEBUG: sending password reset to $email');
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      // ignore: avoid_print
+      print('DEBUG: password reset email sent to $email');
+  if (!mounted) return;
+  messenger.showSnackBar(const SnackBar(content: Text('Link reset password telah dikirim ke email.')));
+    } on FirebaseAuthException catch (e) {
+      // ignore: avoid_print
+      print('DEBUG: sendPasswordResetEmail failed: ${e.code} - ${e.message}');
+  if (!mounted) return;
+  messenger.showSnackBar(SnackBar(content: Text(_firebaseAuthErrorMessage(e))));
+    } catch (e) {
+      // catch-all for unexpected errors
+      // ignore: avoid_print
+      print('DEBUG: sendPasswordResetEmail unexpected error: $e');
+  if (!mounted) return;
+  messenger.showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $e')));
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return; // user cancelled
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_firebaseAuthErrorMessage(e))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal login dengan Google: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 26, 18, 22),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      colors: [
+                        scheme.primaryContainer,
+                        scheme.surfaceContainerLow,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: scheme.primary,
+                        child: Icon(
+                          Icons.lock_person_rounded,
+                          color: scheme.onPrimary,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Login Akun',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Masuk untuk melanjutkan ke Catat Kelas',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_rounded),
+                  ),
+                  validator: (v) {
+                    final value = (v ?? '').trim();
+                    if (value.isEmpty) return 'Email wajib diisi';
+                    if (!_isValidEmail(value)) return 'Format email tidak valid';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                      ),
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                    ),
+                  ),
+                  validator: (v) {
+                    final value = v ?? '';
+                    if (value.isEmpty) return 'Password wajib diisi';
+                    if (!_isStrongPassword(value)) {
+                      return 'Minimal 8 karakter, kombinasi huruf dan angka';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _forgotPassword,
+                    child: const Text('Lupa Password?'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: _loading ? null : _login,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(_loading ? 'Memproses...' : 'Login'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _signInWithGoogle,
+                  icon: Icon(
+                    Icons.login,
+                    size: 20,
+                    color: scheme.primary,
+                  ),
+                  label: const Text('Masuk dengan Google'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    foregroundColor: scheme.onSurface,
+                    side: BorderSide(color: scheme.onSurface.withOpacity(0.12)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      _buildFadeSlideRoute(const _AuthRegisterPage()),
+                    );
+                  },
+                  child: const Text('Daftar Akun Baru'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthRegisterPage extends StatefulWidget {
+  const _AuthRegisterPage();
+
+  @override
+  State<_AuthRegisterPage> createState() => _AuthRegisterPageState();
+}
+
+class _AuthRegisterPageState extends State<_AuthRegisterPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _register() async {
+    if (_formKey.currentState?.validate() != true) return;
+    setState(() => _loading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_firebaseAuthErrorMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Daftar Akun Baru')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  elevation: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          scheme.primaryContainer,
+                          scheme.surfaceContainerLow,
+                        ],
+                      ),
+                    ),
+                    child: Text(
+                      'Buat akun baru untuk mengakses aplikasi. Password wajib minimal 8 karakter berisi huruf dan angka.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_rounded),
+                  ),
+                  validator: (v) {
+                    final value = (v ?? '').trim();
+                    if (value.isEmpty) return 'Email wajib diisi';
+                    if (!_isValidEmail(value)) return 'Format email tidak valid';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded),
+                      onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  validator: (v) {
+                    final value = v ?? '';
+                    if (value.isEmpty) return 'Password wajib diisi';
+                    if (!_isStrongPassword(value)) {
+                      return 'Minimal 8 karakter, kombinasi huruf dan angka';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _confirmCtrl,
+                  obscureText: _obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Konfirmasi Password',
+                    prefixIcon: const Icon(Icons.lock_reset_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded),
+                      onPressed: () =>
+                          setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  validator: (v) {
+                    final value = v ?? '';
+                    if (value.isEmpty) return 'Konfirmasi password wajib diisi';
+                    if (value != _passwordCtrl.text) return 'Password tidak sama';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _loading ? null : _register,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(_loading ? 'Memproses...' : 'Daftar Akun Baru'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

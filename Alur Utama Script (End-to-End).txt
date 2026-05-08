@@ -142,3 +142,114 @@ Lakukan aksi dari app (misal tambah kategori), lalu refresh Data tab dan lihat d
 Tambahan penting:
 
 Di app ini, transaksi dan attendanceSessions masih lokal (belum Firestore), jadi memang tidak akan muncul di Firestore saat ini.
+
+
+File utama yang mengandung UI + logika auth: school_finance_app.dart
+Widget login: _AuthLoginPage (stateful) — di sinilah field email/password & tombol login/lupa-password berada
+Fungsi validasi: _isValidEmail, _isStrongPassword
+Fungsi login: _login() → memanggil FirebaseAuth.instance.signInWithEmailAndPassword(...)
+Toggle visibility password: state boolean _obscure + suffixIcon pada TextFormField
+Forgot password: _forgotPassword() → FirebaseAuth.instance.sendPasswordResetEmail(...) (saya sudah memperbarui supaya memunculkan dialog ketika field kosong)
+Google Sign-In (opsional): _signInWithGoogle() → GoogleSignIn() + FirebaseAuth.instance.signInWithCredential(...)
+App routing setelah login: SchoolFinanceApp.build() menggunakan StreamBuilder pada FirebaseAuth.instance.authStateChanges() — bila user non-null → tampilkan main app; bila null → tampilkan _AuthLoginPage
+Detail lengkap — file dan alur langkah demi langkah
+
+Di mana UI password berada
+File: school_finance_app.dart
+Widget: class _AuthLoginPage extends StatefulWidget dan state _AuthLoginPageState.
+Komponen UI relevan:
+Email field:
+TextFormField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, ...)
+Password field:
+TextFormField(controller: _passwordCtrl, obscureText: _obscure, decoration: ..., suffixIcon: IconButton(...))
+Variabel state controlling visibility: bool _obscure = true;
+Saat pengguna mengetuk suffixIcon, handler memanggil setState(() => _obscure = !_obscure), sehingga obscureText berubah dan teks password muncul/tersembunyi.
+Tombol Login:
+FilledButton(onPressed: _loading ? null : _login, ...)
+Link “Lupa Password?”:
+TextButton(onPressed: _forgotPassword, child: const Text('Lupa Password?'))
+Tombol Daftar:
+TextButton(... Navigator.push to _AuthRegisterPage ...)
+Validasi input password / email yang dipakai sebelum submit
+Fungsi helper:
+_isValidEmail(String) — regex sederhana memeriksa format email.
+_isStrongPassword(String) — regex memeriksa minimal 8 karakter dan kombinasi huruf+angka.
+Validator pada TextFormField password:
+Jika kosong → 'Password wajib diisi'
+Jika tidak memenuhi _isStrongPassword(...) → 'Minimal 8 karakter, kombinasi huruf dan angka'
+Form dibungkus Form(key: _formKey) sehingga _login() memanggil if (_formKey.currentState?.validate() != true) return; sebelum melakukan autentikasi.
+Fungsi yang melakukan login (logika)
+Nama fungsi: _login() di _AuthLoginPageState.
+Alur dalam _login():
+Validasi form (lihat poin 2).
+setState → _loading = true (men-disable tombol).
+Panggilan Firebase Auth: await FirebaseAuth.instance.signInWithEmailAndPassword( email: _emailCtrl.text.trim(), password: _passwordCtrl.text, );
+Jika ada FirebaseAuthException → tampilkan pesan error ke user:
+Di-handle dengan menampilkan SnackBar(content: Text(_firebaseAuthErrorMessage(e)))
+_firebaseAuthErrorMessage(FirebaseAuthException e) adalah fungsi map error.code → pesan user-friendly (mis. 'user-not-found', 'wrong-password', dll).
+Di finally: jika mounted → setState _loading = false.
+Efek samping penting:
+Jika sign-in berhasil, Firebase mengubah state auth; StreamBuilder di SchoolFinanceApp (lihat bagian 4) akan menerima event user non-null dan otomatis menampilkan halaman utama aplikasi (tanpa perlu Navigator.push manual).
+Bagaimana app memilih untuk menampilkan login vs main app
+File: school_finance_app.dart, method build() di SchoolFinanceApp:
+Jika widget.firebaseEnabled == true → app menggunakan: StreamBuilder<User?>( stream: FirebaseAuth.instance.authStateChanges(), builder: (ctx, snap) { if (snap.connectionState == ConnectionState.waiting) return _AuthLoadingPage(); final user = snap.data; return user == null ? const _AuthLoginPage() : _buildMainScaffold(); } )
+Jika firebaseEnabled == false → langsung tampil home tanpa login (app bypass auth).
+Jadi login sukses tidak meng-navigate secara eksplisit; perubahan auth state yang dipublikasikan Firebase menyebabkan widget rebuild dan menampilkan main app.
+Forgot Password (alur reset password)
+Fungsi: _forgotPassword() di _AuthLoginPageState.
+Alur:
+Ambil email dari _emailCtrl.text.trim().
+Jika email invalid/empty → sebelumnya menampilkan SnackBar; sekarang kode telah dimodifikasi untuk memunculkan dialog input email bila field kosong (saya yang mengubah).
+Memanggil: await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+Jika sukses → tampilkan SnackBar: 'Link reset password telah dikirim ke email.'
+Jika error FirebaseAuthException → tangani dan tampilkan pesan user-friendly via _firebaseAuthErrorMessage.
+Catatan: reset password mengirim email dari Firebase; agar email dikirim, Authentication provider Email/Password harus aktif di Firebase Console.
+Google Sign-In (opsional)
+Fungsi: saya menambahkan _signInWithGoogle() yang:
+memanggil GoogleSignIn().signIn() → mengambil googleAuth → buat credential GoogleAuthProvider.credential(...) → FirebaseAuth.instance.signInWithCredential(credential)
+Jika berhasil → auth state berubah → app masuk otomatis.
+Perlu konfigurasi Firebase (SHA cert di Android, konfigurasi iOS/Web) agar sign-in bekerja.
+Register flow
+Widget: _AuthRegisterPage (stateful) dan _register() method:
+_register() mem-validasi form lalu memanggil: await FirebaseAuth.instance.createUserWithEmailAndPassword( email: _emailCtrl.text.trim(), password: _passwordCtrl.text, );
+Jika berhasil → Navigator.pop(context) ke layar login (user bisa login).
+Jika error → tampilkan SnackBar (menggunakan _firebaseAuthErrorMessage).
+Error handling & user feedback
+Semua error Firebase diubah ke pesan via _firebaseAuthErrorMessage(FirebaseAuthException e) yang menangani banyak kode error dan memberikan pesan lokal (Bahasa Indonesia).
+UI feedback: SnackBar dipakai untuk menampilkan pesan sukses/gagal.
+Tombol LOGIN menggunakan _loading untuk men-disable saat operasi berlangsung.
+Letak helper / dependency terkait
+Inisialisasi Firebase & repository:
+File main.dart (memanggil Firebase.initializeApp(...)); main menentukan firebaseEnabled yang dikirim ke SchoolFinanceApp.
+Repository master data terpisah: master_firestore_repository.dart (tidak berhubungan langsung dengan auth; menyimpan master categories/users dsb.)
+Praktis — langkah pengecekan bila "Lupa Password" belum bekerja
+
+Pastikan app memang menjalankan auth flow:
+Jalankan app dengan Firebase enabled (di main() app mencoba Firebase init; jika init gagal, firebaseEnabled akan false dan app melewati login screen).
+Jika firebaseEnabled == false maka tombol Lupa Password tidak relevan karena login screen tidak muncul.
+Pastikan user/email ada di Firebase Console → Authentication → Users.
+Pastikan Email/Password provider diaktifkan di Firebase Console → Authentication → Sign-in method.
+Uji alur:
+Buka app, masukkan email yang terdaftar, tekan "Lupa Password?"
+Jika email field kosong → sekarang akan muncul dialog input email (karena perubahan saya). Isikan email dan klik Kirim.
+Periksa output/log konsol saat panggilan sendPasswordResetEmail(...) — apakah ada exception? (catat pesan).
+Periksa inbox/spam email.
+Jika tidak terkirim:
+Periksa Firebase Console → Authentication → Templates → Reset Password (pastikan template tidak dimodifikasi jadi gagal).
+Jika Anda menggunakan custom SMTP (di Console) pastikan kredensial SMTP valid.
+Cek logs di console (jika ada) atau tangkap FirebaseAuthException message.
+Ringkasan file / simbol penting (quick reference)
+
+main.dart — inisialisasi Firebase; memberikan firebaseEnabled ke SchoolFinanceApp
+school_finance_app.dart — semua auth UI & logika:
+_AuthLoginPage / _AuthLoginPageState:
+fields: _emailCtrl, _passwordCtrl, _obscure, _loading
+UI: TextFormField email, TextFormField password dengan obscureText: _obscure dan suffixIcon toggle
+fungsi: _login(), _forgotPassword(), _signInWithGoogle() (jika tersedia)
+_AuthRegisterPage / _AuthRegisterPageState:
+fungsi: _register() → createUserWithEmailAndPassword
+SchoolFinanceApp.build():
+StreamBuilder pada FirebaseAuth.instance.authStateChanges() menentukan tampilan login vs main app
+Helper:
+_isValidEmail, _isStrongPassword, _firebaseAuthErrorMessage
+Jika Anda mau saya bisa:
